@@ -5,15 +5,15 @@ let statsEl = null;
 let brotli = null;
 
 const init = async () => {
+    // Initialize brotli from CDN
+    brotli = await import("https://unpkg.com/brotli-wasm@3.0.0/index.web.js?module").then(m => m.default);
+    
     handleLegacyUrl();
     initCodeEditor();
     initLangSelector();
     initCode();
     initClipboard();
     initModals();
-
-    // Initialize brotli from CDN
-    brotli = await import("https://unpkg.com/brotli-wasm@3.0.0/index.web.js?module").then(m => m.default);
 };
 
 const initCodeEditor = () => {
