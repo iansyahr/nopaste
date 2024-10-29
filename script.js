@@ -1,18 +1,19 @@
-const blob = new Blob(['importScripts("https://cdn.jsdelivr.net/npm/lzma@2.3.2/src/lzma_worker.min.js");']);
-const lzma = new LZMA(window.URL.createObjectURL(blob));
-
 let editor = null;
 let select = null;
 let clipboard = null;
 let statsEl = null;
+let brotli = null;
 
-const init = () => {
+const init = async () => {
     handleLegacyUrl();
     initCodeEditor();
     initLangSelector();
     initCode();
     initClipboard();
     initModals();
+
+    // Initialize brotli from CDN
+    brotli = await import("https://unpkg.com/brotli-wasm@3.0.0/index.web.js?module").then(m => m.default);
 };
 
 const initCodeEditor = () => {
@@ -180,16 +181,15 @@ const decompress = (base64, cb) => {
     req.open('GET', 'data:application/octet;base64,' + base64);
     req.responseType = 'arraybuffer';
     req.onload = (e) => {
-        lzma.decompress(
-            new Uint8Array(e.target.response),
-            (result, err) => {
-                progressBar.style.width = '0';
-                cb(result, err);
-            },
-            (progress) => {
-                progressBar.style.width = 100 * progress + '%';
-            }
-        );
+        try {
+            const decompressedData = brotli.decompress(new Uint8Array(e.target.response));
+            const code = new TextDecoder().decode(decompressedData);
+            progressBar.style.width = '0';
+            cb(code, null);
+        } catch (err) {
+            progressBar.style.width = '0';
+            cb(null, err);
+        }
     };
     req.send();
 };
@@ -202,26 +202,20 @@ const compress = (str, cb) => {
     }
     const progressBar = byId('progress');
 
-    lzma.compress(
-        str,
-        1,
-        (compressed, err) => {
-            if (err) {
-                progressBar.style.width = '0';
-                cb(compressed, err);
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = () => {
-                progressBar.style.width = '0';
-                cb(reader.result.substr(reader.result.indexOf(',') + 1));
-            };
-            reader.readAsDataURL(new Blob([new Uint8Array(compressed)]));
-        },
-        (progress) => {
-            progressBar.style.width = 100 * progress + '%';
-        }
-    );
+    try {
+        const uncompressedData = new TextEncoder().encode(str);
+        const compressedData = brotli.compress(uncompressedData);
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            progressBar.style.width = '0';
+            cb(reader.result.substr(reader.result.indexOf(',') + 1));
+        };
+        reader.readAsDataURL(new Blob([new Uint8Array(compressedData)]));
+    } catch (err) {
+        progressBar.style.width = '0';
+        cb('', err);
+    }
 };
 
 const slugify = (str) =>
