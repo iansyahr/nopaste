@@ -204,7 +204,7 @@ const compress = (str, cb) => {
 
     try {
         const uncompressedData = new TextEncoder().encode(str);
-        const compressedData = brotli.compress(uncompressedData);
+        const compressedData = brotli.compress(uncompressedData, { quality: 11 });
 
         const reader = new FileReader();
         reader.onload = () => {
